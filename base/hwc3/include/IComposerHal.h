@@ -47,6 +47,7 @@
 #include <aidl/android/hardware/graphics/composer3/DisplayBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCommand.h>
+#include <aidl/android/hardware/graphics/composer3/DisplayConfiguration.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayConnectionType.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSample.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSamplingAttributes.h>
@@ -80,6 +81,7 @@
 // avoid naming conflict
 using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 using AidlNativeHandle = aidl::android::hardware::common::NativeHandle;
+using DisplayConfiguration = aidl::android::hardware::graphics::composer3::DisplayConfiguration;
 
 namespace aidl::android::hardware::graphics::composer3::impl {
 
@@ -127,6 +129,11 @@ class IComposerHal {
     virtual int32_t getDisplayCapabilities(int64_t display,
                                            std::vector<DisplayCapability>* caps) = 0;
     virtual int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) = 0;
+    virtual int32_t getDisplayConfigurations(int64_t display, int32_t maxFrameIntervalNs,
+                                             std::vector<DisplayConfiguration>* configs) = 0;
+    virtual int32_t notifyExpectedPresent(int64_t display,
+                                          const ClockMonotonicTimestamp& expectedPresentTime,
+                                          int32_t frameIntervalNs) = 0;
     virtual int32_t getDisplayConnectionType(int64_t display, DisplayConnectionType* outType) = 0;
     virtual int32_t getDisplayIdentificationData(int64_t display, DisplayIdentification *id) = 0;
     virtual int32_t getDisplayName(int64_t display, std::string* outName) = 0;
@@ -222,6 +229,7 @@ class IComposerHal {
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
     virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
     virtual int32_t setRefreshRateChangedCallbackDebugEnabled(int64_t display, bool enabled) = 0;
+    virtual int32_t getMaxLayerPictureProfiles(int64_t display, int32_t* outMaxProfiles) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail

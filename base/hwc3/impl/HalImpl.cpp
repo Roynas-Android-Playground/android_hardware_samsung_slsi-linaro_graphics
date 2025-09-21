@@ -341,6 +341,40 @@ int32_t HalImpl::getDisplayConfigs(int64_t display, std::vector<int32_t>* config
     return HWC2_ERROR_NONE;
 }
 
+int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
+                                          std::vector<DisplayConfiguration>* outConfigs) {
+    std::vector<int32_t> configIds;
+    RET_IF_ERR(getDisplayConfigs(display, &configIds));
+
+    for (const auto configId : configIds) {
+        DisplayConfiguration config;
+        config.configId = configId;
+        // Get required display attributes
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::WIDTH, &config.width));
+        RET_IF_ERR(
+                getDisplayAttribute(display, configId, DisplayAttribute::HEIGHT, &config.height));
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::VSYNC_PERIOD,
+                                       &config.vsyncPeriod));
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::CONFIG_GROUP,
+                                       &config.configGroup));
+        // Get optional display attributes
+        int32_t dpiX, dpiY;
+        auto statusDpiX = getDisplayAttribute(display, configId, DisplayAttribute::DPI_X, &dpiX);
+        auto statusDpiY = getDisplayAttribute(display, configId, DisplayAttribute::DPI_Y, &dpiY);
+        // TODO(b/294120341): getDisplayAttribute for DPI should return dots per inch
+        if (statusDpiX == HWC2_ERROR_NONE && statusDpiY == HWC2_ERROR_NONE) {
+            config.dpi = {dpiX / 1000.0f, dpiY / 1000.0f};
+        }
+        outConfigs->push_back(config);
+    }
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t HalImpl::notifyExpectedPresent(int64_t, const ClockMonotonicTimestamp&, int32_t) {
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t HalImpl::getDisplayConnectionType(int64_t display, DisplayConnectionType* outType) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
@@ -1004,6 +1038,11 @@ int32_t HalImpl::setRefreshRateChangedCallbackDebugEnabled(int64_t /* display*/,
                                                            bool /* enabled */) {
     // TODO(b/267825022) Add implementation for the HAL
     return EX_UNSUPPORTED_OPERATION;
+}
+
+int32_t HalImpl::getMaxLayerPictureProfiles([[maybe_unused]] int64_t display,
+                                            [[maybe_unused]] int32_t* outMaxProfiles) {
+    return HWC2_ERROR_UNSUPPORTED;
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl
