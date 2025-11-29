@@ -436,11 +436,16 @@ int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &conf
         if (!((planeAlpha >= 0) && (planeAlpha <= 255)))
             config.plane_alpha = 0;
     } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
-               (display_config.state == display_config.WIN_STATE_CURSOR)) {
+               (display_config.state == display_config.WIN_STATE_CURSOR) ||
+	       (display_config.state == display_config.WIN_STATE_FINGERPRINT) {
         if (display_config.state == display_config.WIN_STATE_BUFFER)
             config.state = config.DECON_WIN_STATE_BUFFER;
-        else
+        else if (display_config.state == display_config.WIN_STATE_CURSOR)
             config.state = config.DECON_WIN_STATE_CURSOR;
+#ifdef HAS_FINGERPRINT_MASK_LAYER
+        else if (display_config.state == display_config.WIN_STATE_FINGERPRINT)
+            config.state = config.DECON_WIN_STATE_FINGERPRINT;
+#endif
 
         config.fd_idma[0] = display_config.fd_idma[0];
         config.fd_idma[1] = display_config.fd_idma[1];

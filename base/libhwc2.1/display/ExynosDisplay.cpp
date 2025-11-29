@@ -1848,6 +1848,19 @@ int ExynosDisplay::deliverWinConfigData(DevicePresentInfo &presentInfo) {
 #endif
         ret = 0;
     } else {
+#if defined(HAS_FINGERPRINT_MASK_LAYER) && defined(UDFPS_DIM_LAYER_ZORDER)
+        for (size_t i = mLayers.size(); i-- > 0; ) {
+            if (mLayers[i]->mZOrder == UDFPS_DIM_LAYER_ZORDER) {
+                for (size_t j = 0; j < mDpuData.configs.size(); j++) {
+                    if (mDpuData.configs[j].state == mDpuData.configs[j].WIN_STATE_BUFFER) {
+                        mDpuData.configs[j].state = mDpuData.configs[j].WIN_STATE_FINGERPRINT;
+                        HDEBUGLOGD(eDebugWinConfig, "Sent UDFPS Mask layer command to DECON");
+                        break;
+                    }
+                }
+            }
+        }
+#endif
         bool waitFence = (mDisplayInterface->mType == INTERFACE_TYPE_DRM);
 #ifdef WAIT_FENCE
         waitFence = true;
