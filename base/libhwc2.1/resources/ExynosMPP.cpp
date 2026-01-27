@@ -1678,7 +1678,7 @@ bool ExynosMPP::canSkipProcessing() {
         dst.fullHeight = mAssignedDisplayInfo.yres;
         dst.dataSpace = colorModeToDataspace(mAssignedDisplayInfo.colorMode);
     }
-    return ((needDstBufRealloc(dst, mCurrentDstBuf) == false) & canUsePrevFrame(source->mSrcImg));
+    return ((needDstBufRealloc(dst, mCurrentDstBuf) == false) && canUsePrevFrame(source->mSrcImg));
 }
 
 /**
