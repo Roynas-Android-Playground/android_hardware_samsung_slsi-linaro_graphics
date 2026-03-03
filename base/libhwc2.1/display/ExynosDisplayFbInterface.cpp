@@ -437,7 +437,7 @@ int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &conf
             config.plane_alpha = 0;
     } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
                (display_config.state == display_config.WIN_STATE_CURSOR) ||
-	       (display_config.state == display_config.WIN_STATE_FINGERPRINT) {
+	       (display_config.state == display_config.WIN_STATE_FINGERPRINT)) {
         if (display_config.state == display_config.WIN_STATE_BUFFER)
             config.state = config.DECON_WIN_STATE_BUFFER;
         else if (display_config.state == display_config.WIN_STATE_CURSOR)
