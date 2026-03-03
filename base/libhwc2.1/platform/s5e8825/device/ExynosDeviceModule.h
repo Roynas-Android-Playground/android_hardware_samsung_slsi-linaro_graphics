@@ -18,25 +18,12 @@
 #define EXYNOS_DEVICE_MODULE_H
 
 #include "ExynosDevice.h"
-#include "CpuPerfInfo.h"
 
 
 class ExynosDeviceModule : public ExynosDevice {
     public:
         ExynosDeviceModule();
         ~ExynosDeviceModule();
-        virtual bool supportPerformaceAssurance() {
-#ifdef USES_HWC_CPU_PERF_MODE
-            return true;
-#else
-            return false;
-#endif
-        };
-        virtual void setCPUClocksPerCluster(uint32_t fps);
-        virtual void acquireCPUPerfPerCluster(uint32_t fps);
-        virtual void releaseCPUPerfPerCluster();
-        bool mIsEPICHandleInit = false;
-        epic_handle cl_min_handle[CPU_CLUSTER_CNT];
 };
 
 #endif

@@ -13,7 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef EXYNOS_VIRTUAL_DISPLAY_MODULE_H
+#define EXYNOS_VIRTUAL_DISPLAY_MODULE_H
 
-#ifndef EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
-#define EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
+#include "ExynosDisplay.h"
+#include "ExynosVirtualDisplay.h"
+
+class ExynosVirtualDisplayModule : public ExynosVirtualDisplay {
+public:
+    ExynosVirtualDisplayModule(DisplayIdentifier node);
+    ~ExynosVirtualDisplayModule();
+
+    virtual void initDisplayInterface(uint32_t interfaceType,
+            void* deviceData, size_t& deviceDataSize);
+};
+
 #endif

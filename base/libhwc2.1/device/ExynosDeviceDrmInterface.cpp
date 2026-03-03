@@ -15,12 +15,17 @@
  */
 
 #include <drm/drm_mode.h>
-#include "exynos_drm_modifier.h"
 #include "ExynosDeviceDrmInterface.h"
 #include "ExynosHWCDebug.h"
 #include <hardware/hwcomposer_defs.h>
 #include "DeconDrmHeader.h"
 #include "DrmDataType.h"
+
+#if __has_include(<drm/exynos_drm_modifier.h>)
+#  include <drm/exynos_drm_modifier.h>
+#else
+#  include "exynos_drm_modifier.h"
+#endif
 
 ExynosDeviceDrmInterface::ExynosDeviceDrmInterface()
     : mDrmDevice(nullptr) {

@@ -13,7 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef EXYNOS_EXTERNAL_DISPLAY_MODULE_H
+#define EXYNOS_EXTERNAL_DISPLAY_MODULE_H
 
-#ifndef EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
-#define EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
+#include "ExynosDisplay.h"
+#include "ExynosExternalDisplay.h"
+
+class ExynosExternalDisplayModule : public ExynosExternalDisplay {
+    public:
+        ExynosExternalDisplayModule(DisplayIdentifier node);
+        ~ExynosExternalDisplayModule();
+        virtual int32_t validateWinConfigData();
+};
+
 #endif

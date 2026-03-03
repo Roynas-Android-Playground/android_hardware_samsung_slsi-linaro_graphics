@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
-#define EXYNOS_DISPLAY_FB_INTERFACE_MODULE_H
-#endif
+#include "ExynosDeviceModule.h"
+
+ExynosDeviceModule::ExynosDeviceModule() {
+}
+
+ExynosDeviceModule::~ExynosDeviceModule() {
+}

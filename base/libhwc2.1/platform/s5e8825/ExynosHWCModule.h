@@ -22,10 +22,7 @@
 #include "ExynosHWCHelper.h"
 
 #define VSYNC_DEV_PREFIX    "/sys/devices/platform/"
-#define DECON_F_VSYNC_NODE  "14940000.decon_0/vsync"
-#define DECON_F_FB_NODE     "/dev/graphics/fb0"
-#define DECON_T_VSYNC_NODE  "16102000.decon_2/vsync"
-#define DECON_T_FB_NODE     "/dev/graphics/fb2"
+#define DECON_DRM_NODE     "/dev/dri/card0"
 #define PSR_DEV_NAME        "14900000.decon_0/psr_info"
 
 #define DP_LINK_NAME	"120b0000.displayport"
@@ -106,7 +103,7 @@ struct exynos_display_t {
 #define EXTERNAL_MAIN_EXTERNAL_WINCNT  2
 #define PRIMARY_MAIN_VIRTUAL_WINCNT 2
 #define DEFAULT_MPP_DST_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC
-#define MSC_CLOCK   663000
+#define MSC_CLOCK   800000
 
 enum {
     DISPLAY_MODE_PRIMARY_MAIN = 0,  /* This is default mode */
@@ -157,9 +154,9 @@ const exynos_mpp_t AVAILABLE_M2M_MPP_UNITS[] = {
      3. For the process about preassigning OTFMPP resources, display that do not use DPU like as virtual display
         should be alligned at the end. */
 const exynos_display_t AVAILABLE_DISPLAY_UNITS[] = {
-    {HWC_DISPLAY_PRIMARY, 0, "PrimaryDisplay",      DECON_F_FB_NODE, DECON_F_VSYNC_NODE},
-    {HWC_DISPLAY_EXTERNAL, 0, "ExternalDisplay",    DECON_T_FB_NODE, DECON_T_VSYNC_NODE},
-    {HWC_DISPLAY_VIRTUAL, 0, "VirtualDisplay", DECON_T_FB_NODE, {}},
+    {HWC_DISPLAY_PRIMARY, 0, "PrimaryDisplay",      DECON_DRM_NODE, ""},
+    {HWC_DISPLAY_EXTERNAL, 0, "ExternalDisplay",    DECON_DRM_NODE, ""},
+    {HWC_DISPLAY_VIRTUAL, 0, "VirtualDisplay", DECON_DRM_NODE, ""},
 };
 
 #define DISPLAY_COUNT sizeof(AVAILABLE_DISPLAY_UNITS)/sizeof(exynos_display_t)

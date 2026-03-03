@@ -13,13 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef EXYNOS_DISPLAY_MODULE_H
+#define EXYNOS_DISPLAY_MODULE_H
 
-#include "ExynosDisplayFbInterfaceModule.h"
+#include "ExynosDisplay.h"
+#include "ExynosPrimaryDisplay.h"
 
-decon_idma_type getDPPChannel(uint32_t type, uint32_t index) {
-    for (auto &chMap : IDMA_CHANNEL_MAP) {
-        if((chMap.type == type) && (chMap.index == index))
-            return chMap.channel;
-    }
-    return MAX_DECON_DMA_TYPE;
-}
+class ExynosPrimaryDisplayModule : public ExynosPrimaryDisplay {
+    public:
+        ExynosPrimaryDisplayModule(DisplayIdentifier node);
+        ~ExynosPrimaryDisplayModule();
+        virtual int32_t validateWinConfigData();
+        virtual void doPreProcessing(DeviceValidateInfo &validateInfo,
+                uint64_t &geometryChanged) override;
+        virtual bool isEnabled() {
+            return mPlugState;
+        }
+};
+
+#endif

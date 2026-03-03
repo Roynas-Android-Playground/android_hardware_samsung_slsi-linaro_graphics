@@ -15,16 +15,54 @@
  */
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <xf86drm.h>
-#include "exynos_drm_modifier.h"
 #include "ExynosDrmFramebufferManager.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
+
+#if __has_include(<drm/exynos_drm_modifier.h>)
+#  include <drm/exynos_drm_modifier.h>
+#else
+#  include "exynos_drm_modifier.h"
+#endif
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t SAJC_KEY_INDEX = 1;
 
 uint64_t getSBWCModifierBits(const format_description &format_desc) {
     uint32_t sbwcType = format_desc.type & FORMAT_SBWC_MASK;
+
+#if !defined(SBWC_MOD_NONE) // 5.10 has this unset
+    if (sbwcType == 0) {
+        return 0;
+    }
+
+    uint32_t bitType = format_desc.type & BIT_MASK;
+    if (bitType == BIT10) {
+        switch (sbwcType) {
+        case SBWC_LOSSY_40:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x2, SBWC_FORMAT_MOD_LOSSY);
+        case SBWC_LOSSY_60:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x3, SBWC_FORMAT_MOD_LOSSY);
+        case SBWC_LOSSY_80:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x4, SBWC_FORMAT_MOD_LOSSY);
+        case SBWC_LOSSLESS:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x5, SBWC_FORMAT_MOD_LOSSLESS);
+        default:
+            return 0;
+        }
+    } else if (bitType == BIT8) {
+        switch (sbwcType) {
+        case SBWC_LOSSY_50:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x2, SBWC_FORMAT_MOD_LOSSY);
+        case SBWC_LOSSY_75:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x3, SBWC_FORMAT_MOD_LOSSY);
+        case SBWC_LOSSLESS:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLK_BYTENUM_32x4, SBWC_FORMAT_MOD_LOSSLESS);
+        default:
+            return 0;
+        }
+    }
+#elif !defined(SBWC_ALIGN_MASK) // 5.15 has this unset
     if (sbwcType == 0) {
         if ((format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_420_SPN_SBWC_DECOMP) ||
             (format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_P010_N_SBWC_DECOMP))
@@ -56,7 +94,45 @@ uint64_t getSBWCModifierBits(const format_description &format_desc) {
             return 0;
         }
     }
+#else // 6.1 kernels
+    bool alignment = 0;
+    if ((format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_256_SBWC) ||
+        (format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_256_SBWC)) {
+            alignment = 1;
+    }
 
+    if (sbwcType == 0) {
+        if ((format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_420_SPN_SBWC_DECOMP) ||
+            (format_desc.halFormat == HAL_PIXEL_FORMAT_EXYNOS_P010_N_SBWC_DECOMP))
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_NONE, 0, alignment);
+        return 0;
+    }
+    if (sbwcType == SBWC_LOSSLESS)
+        return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSLESS, 0, alignment);
+
+    uint32_t bitType = format_desc.type & BIT_MASK;
+    if (bitType == BIT10) {
+        switch (sbwcType) {
+        case SBWC_LOSSY_40:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSY, SBWCL_10B_40, alignment);
+        case SBWC_LOSSY_60:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSY, SBWCL_10B_60, alignment);
+        case SBWC_LOSSY_80:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSY, SBWCL_10B_80, alignment);
+        default:
+            return 0;
+        }
+    } else if (bitType == BIT8) {
+        switch (sbwcType) {
+        case SBWC_LOSSY_50:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSY, SBWCL_8B_50, alignment);
+        case SBWC_LOSSY_75:
+            return DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_MOD_LOSSY, SBWCL_8B_75, alignment);
+        default:
+            return 0;
+        }
+    }
+#endif
     return 0;
 }
 
@@ -242,7 +318,13 @@ int32_t FramebufferManager::getBuffer(const uint32_t displayType,
             modifiers[0] |= DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
         } else if (config.compressionInfo.type == COMP_TYPE_SAJC) {
             uint32_t compressed_block_size = config.compressionInfo.SAJCMaxBlockSize;
+#if !defined(SAJC_4K_MODE) // 5.10/5.15 has this unset
             modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SAJC(compressed_block_size);
+#else // 6.1 kernels
+            // HACK: We don't have logic to fetch SW_Mode,
+            // So let's just keep the old behavior for now.
+            modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SAJC(compressed_block_size, 0);
+#endif
             //SAJC buffer has 2 planes//
             planeNum++;
         } else {
