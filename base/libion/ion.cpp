@@ -243,7 +243,11 @@ int DmabufExporter::alloc_dma_heap(size_t len, unsigned int legacy_heap_mask, un
 
 int DmabufExporter::open(void) {
     if (version == DMAHEAP_VERSION)
-        return 0;
+        /*
+         * Keep a real client descriptor so exynos_ion_close() can retain its
+         * legacy meaning for both client and allocated DMA-BUF descriptors.
+         */
+        return systemInterface.Open("/dev/dma_heap/system");
 
     int fd = systemInterface.Open("/dev/ion");
     if (fd < 0)
@@ -253,12 +257,9 @@ int DmabufExporter::open(void) {
 }
 
 int DmabufExporter::close(int fd) {
-    if (version == DMAHEAP_VERSION)
-        return 0;
-
     int ret = systemInterface.Close(fd);
     if (ret < 0)
-        ALOGE("closing fd %d of /dev/ion failed: %s", fd, strerror(errno));
+        ALOGE("closing fd %d failed: %s", fd, strerror(errno));
     return ret;
 }
 

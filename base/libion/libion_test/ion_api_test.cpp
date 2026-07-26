@@ -240,7 +240,8 @@ TEST_F(IonAPI, DmaHeap)
     MockSystemInterface mockSystemInterface;
 
     EXPECT_CALL(mockSystemInterface, Open(_))
-        .Times(4)
+        .Times(5)
+        .WillOnce(Return(1))
         .WillOnce(Return(1))
         .WillOnce(Return(1))
         .WillOnce(Return(1))
@@ -269,7 +270,8 @@ TEST_F(IonAPI, DmaHeap)
         .WillOnce(Return(-1));
 
     EXPECT_CALL(mockSystemInterface, Close(_))
-        .Times(3)
+        .Times(4)
+        .WillOnce(Return(0))
         .WillOnce(Return(0))
         .WillOnce(Return(0))
         .WillOnce(Return(0));
@@ -277,7 +279,7 @@ TEST_F(IonAPI, DmaHeap)
     DmabufExporter DmaHeapExporter(mockSystemInterface);
 
     /* Open */
-    EXPECT_LE(0, DmaHeapExporter.open());
+    EXPECT_EQ(1, DmaHeapExporter.open());
 
     /* Close */
     EXPECT_EQ(0, DmaHeapExporter.close(1));
