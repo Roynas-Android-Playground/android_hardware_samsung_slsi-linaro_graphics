@@ -375,7 +375,6 @@ class ExynosDisplay : public ExynosVsyncHandler {
          * Layer list those sorted by z-order
          */
     ExynosSortedLayer mLayers;
-    std::vector<ExynosLayer*> mIgnoreLayers;
 
     /**
          * Layer index, target buffer information for GLES.
@@ -584,7 +583,6 @@ class ExynosDisplay : public ExynosVsyncHandler {
          */
     ExynosLayer *checkLayer(hwc2_layer_t addr, bool printError = true);
 
-    void checkIgnoreLayers();
     virtual void doPreProcessing(DeviceValidateInfo &validateInfo,
                                  uint64_t &geometryChanged);
 

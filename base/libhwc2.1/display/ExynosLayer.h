@@ -292,7 +292,7 @@ class ExynosLayer : public ExynosMPPSource {
          * Descriptor: HWC2_FUNCTION_SET_LAYER_PLANE_ALPHA
          * HWC2_PFN_SET_LAYER_PLANE_ALPHA
          */
-    virtual int32_t setLayerPlaneAlpha(float alpha, uint64_t &geometryFlag);
+    virtual int32_t setLayerPlaneAlpha(float alpha);
 
     /* setLayerSourceCrop(..., crop)
          * Descriptor: HWC2_FUNCTION_SET_LAYER_SOURCE_CROP

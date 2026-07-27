@@ -67,7 +67,7 @@ static int GetThumbnailFormat(int v4l2Format)
             return v4l2Format;
 }
 
-#if HWJPEG_ANDROID_VERSION >= 10
+#if HWJPEG_ANDROID_VERSION >= 11
 #define HWJPEG_INDEX index
 ExynosJpegEncoderForCamera::ExynosJpegEncoderForCamera(bool bBTBComp, unsigned int index)
 #else

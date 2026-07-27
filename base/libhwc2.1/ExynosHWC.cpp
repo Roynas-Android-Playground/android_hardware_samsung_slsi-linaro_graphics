@@ -23,11 +23,14 @@
 
 #include "ExynosHWC.h"
 #include "ExynosHWCModule.h"
+#include "ExynosHWCService.h"
 #include "ExynosDisplay.h"
 #include "ExynosLayer.h"
 #include "ExynosExternalDisplayModule.h"
 #include "ExynosDeviceModule.h"
 #include "ExynosResourceManager.h"
+
+class ExynosHWCService;
 
 using namespace android;
 
@@ -1187,6 +1190,17 @@ int exynos_open(const struct hw_module_t *module, const char *name,
     dev->base.getFunction = exynos_getFunction;
     *device = &dev->base.common;
     ptrDev = dev;
+
+    ALOGD("Start HWCService");
+#ifdef USES_HWC_SERVICES
+    ExynosHWCCtx *hwcCtx = (ExynosHWCCtx *)ptrDev;
+    android::ExynosHWCService *HWCService;
+    HWCService = android::ExynosHWCService::getExynosHWCService();
+    if (HWCService != nullptr) {
+        HWCService->setExynosDevice(hwcCtx->device);
+        HWCService->setBootFinishedCallback(exynos_boot_finished);
+    }
+#endif
 
     return NO_ERROR;
 }

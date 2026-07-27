@@ -20,6 +20,7 @@
 #include "ExynosDeviceModule.h"
 #include "ExynosDevice.h"
 #include "ExynosDisplay.h"
+#include "ExynosHWCService.h"
 #include "ExynosLayer.h"
 #include "ExynosResourceManager.h"
 #include "HalImpl.h"
@@ -99,6 +100,17 @@ void seamlessPossible(hwc2_callback_data_t callbackData, hwc2_display_t hwcDispl
 
 HalImpl::HalImpl(std::unique_ptr<ExynosDevice> device) : mDevice(std::move(device)) {
     initCaps();
+#ifdef USES_HWC_SERVICES
+    LOG(DEBUG) << "Start HWCService";
+    mHwcCtx = std::make_unique<ExynosHWCCtx>();
+    memset(&mHwcCtx->base, 0, sizeof(mHwcCtx->base));
+    mHwcCtx->device = mDevice.get();
+
+    auto hwcService = ::android::ExynosHWCService::getExynosHWCService();
+    hwcService->setExynosDevice(mHwcCtx->device);
+    // This callback is for DP hotplug event if connected
+    // hwcService->setBootFinishedCallback(...);
+#endif
 }
 
 void HalImpl::initCaps() {
@@ -851,7 +863,7 @@ int32_t HalImpl::setLayerPlaneAlpha(int64_t display, int64_t layer, float alpha)
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
-    return mDevice->setLayerPlaneAlpha(halLayer, alpha);
+    return halLayer->setLayerPlaneAlpha(alpha);
 }
 
 int32_t HalImpl::setLayerSidebandStream([[maybe_unused]] int64_t display,

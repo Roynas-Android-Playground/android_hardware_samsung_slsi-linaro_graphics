@@ -63,9 +63,7 @@ class CAppMarkerWriter {
     uint32_t m_szSoftware;
     uint32_t m_szModel;
     uint32_t m_szUniqueID;
-#if HWJPEG_ANDROID_VERSION >= 11
     uint32_t m_szOffsetTime;
-#endif
 
     char *m_pMainBase;
     // The address to write compressed stream of the thumbnail image

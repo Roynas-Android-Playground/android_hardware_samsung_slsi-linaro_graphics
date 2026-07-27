@@ -338,7 +338,6 @@ class ExynosDevice : public ExynosHotplugHandler, ExynosPanelResetHandler, Exyno
     int32_t setLayerDataspace(ExynosDisplay *display, hwc2_layer_t layer,
                               int32_t /*android_dataspace_t*/ dataspace);
     int32_t setLayerDisplayFrame(ExynosLayer *layer, hwc_rect_t frame);
-    int32_t setLayerPlaneAlpha(ExynosLayer *layer, float alpha);
     int32_t setLayerSourceCrop(ExynosLayer *layer, hwc_frect_t crop);
     int32_t setLayerTransform(ExynosLayer *layer,
                               int32_t /*hwc_transform_t*/ transform);

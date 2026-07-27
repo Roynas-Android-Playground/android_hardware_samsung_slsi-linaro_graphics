@@ -100,7 +100,7 @@ class ExynosJpegEncoderForCamera: public ExynosJpegEncoder {
 protected:
     virtual bool EnsureFormatIsApplied();
 public:
-#if HWJPEG_ANDROID_VERSION >= 10
+#if HWJPEG_ANDROID_VERSION >= 11
     ExynosJpegEncoderForCamera(bool bBTBComp = true, unsigned int index = 0);
 #else
     ExynosJpegEncoderForCamera(bool bBTBComp = true);

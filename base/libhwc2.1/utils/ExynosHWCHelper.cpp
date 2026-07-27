@@ -24,7 +24,7 @@
 #include "ExynosHWC.h"
 #include "ExynosLayer.h"
 #include "exynos_sync.h"
-#include <linux/videodev2_exynos_media.h>
+#include "videodev2_exynos_media.h"
 #include "VendorVideoAPI.h"
 #include "ExynosResourceRestriction.h"
 #include "ExynosGraphicBuffer.h"
@@ -502,7 +502,6 @@ compressionInfo_t getCompressionInfo(buffer_handle_t handle) {
         if (isSAJCCompressed(handle)) {
             compressionInfo.SAJCMaxBlockSize = ExynosGraphicBufferMeta::get_sajc_independent_block_size(handle);
             compressionInfo.SAJCHeaderOffset = ExynosGraphicBufferMeta::get_sajc_key_offset(handle);
-            compressionInfo.SAJCSwMode = ExynosGraphicBufferMeta::get_sajc_sw_mode(handle);
         }
     }
 

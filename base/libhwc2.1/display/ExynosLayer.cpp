@@ -59,7 +59,7 @@ ExynosLayer::ExynosLayer(DisplayInfo displayInfo)
       mLayerBuffer(NULL),
       mDamageNum(0),
       mBlending(HWC2_BLEND_MODE_NONE),
-      mPlaneAlpha(1.0),
+      mPlaneAlpha(0),
       mTransform(0),
       mZOrder(1000),
       mDataSpace(HAL_DATASPACE_UNKNOWN),
@@ -422,19 +422,11 @@ int32_t ExynosLayer::setLayerDisplayFrame(hwc_rect_t frame, uint64_t &geometryFl
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosLayer::setLayerPlaneAlpha(float alpha, uint64_t &geometryFlag) {
-    if (alpha < 0.0)
+int32_t ExynosLayer::setLayerPlaneAlpha(float alpha) {
+    if (alpha < 0)
         return HWC2_ERROR_BAD_LAYER;
 
-    if ((mPlaneAlpha != alpha) && ((mPlaneAlpha == 0.0) || (alpha == 0.0)))
-        setGeometryChanged(GEOMETRY_LAYER_IGNORE_CHANGED, geometryFlag);
-
     mPlaneAlpha = alpha;
-
-    if (mPlaneAlpha > 0.0)
-        mLayerFlag &= ~(EXYNOS_HWC_IGNORE_LAYER);
-    else
-        mLayerFlag |= EXYNOS_HWC_IGNORE_LAYER;
 
     return HWC2_ERROR_NONE;
 }

@@ -33,6 +33,7 @@
 #include "DrmDataType.h"
 
 #include "ExynosDisplayInterface.h"
+#include "ExynosHWCService.h"
 
 #include <sys/types.h>
 #include <drm_fourcc.h>

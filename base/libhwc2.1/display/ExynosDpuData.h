@@ -29,7 +29,7 @@ struct exynos_win_config_data {
         WIN_STATE_BUFFER,
         WIN_STATE_UPDATE,
         WIN_STATE_CURSOR,
-        WIN_STATE_FINGERPRINT = 0x20000,
+	WIN_STATE_FINGERPRINT = 0x20000,
     } state = WIN_STATE_DISABLED;
 
     uint32_t color = 0;

@@ -1222,7 +1222,6 @@ int32_t ExynosDevice::validateDisplay(
         return ret;
     }
 
-    display->checkIgnoreLayers();
     if (isFirstValidate(display)) {
         /*
          * Validate all of displays
@@ -2026,12 +2025,6 @@ int32_t ExynosDevice::setLayerDisplayFrame(ExynosLayer *layer, hwc_rect_t frame)
     Mutex::Autolock lock(mMutex);
     clearRenderingStateFlags();
     int32_t ret = layer->setLayerDisplayFrame(frame, mGeometryChanged);
-    return ret;
-}
-
-int32_t ExynosDevice::setLayerPlaneAlpha(ExynosLayer *layer, float alpha) {
-    Mutex::Autolock lock(mMutex);
-    int32_t ret = layer->setLayerPlaneAlpha(alpha, mGeometryChanged);
     return ret;
 }
 

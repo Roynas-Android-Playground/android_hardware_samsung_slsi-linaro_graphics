@@ -79,9 +79,7 @@ void CAppMarkerWriter::Init()
     m_szSoftware = 0;
     m_szModel = 0;
     m_szUniqueID = 0;
-#if HWJPEG_ANDROID_VERSION >= 11
     m_szOffsetTime = 0;
-#endif
 
     m_pThumbBase = NULL;
     m_szMaxThumbSize = 0;

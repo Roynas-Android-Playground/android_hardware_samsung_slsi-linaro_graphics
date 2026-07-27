@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "ExynosDisplay.h"
 #include "ExynosDisplayFbInterface.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosFenceTracer.h"
@@ -160,8 +159,7 @@ int32_t ExynosDisplayFbInterface::getDPUConfig(hwc2_config_t *config) {
     return ret;
 }
 
-int32_t ExynosDisplayFbInterface::setActiveConfig(ExynosDisplay &exynosDisplay,
-                                                  hwc2_config_t config,
+int32_t ExynosDisplayFbInterface::setActiveConfig(hwc2_config_t config,
                                                   displayConfigs_t &displayConfig) {
     int ret = 0;
 #if defined(USE_DPU_SET_CONFIG) || defined(USES_SET_DISPLAY_MODE_IOCTL)
@@ -169,15 +167,13 @@ int32_t ExynosDisplayFbInterface::setActiveConfig(ExynosDisplay &exynosDisplay,
     /* Use win_config ioctl */
     struct decon_win_config_data win_data;
     struct decon_win_config *win_config = win_data.config;
-    int fps = 1000000000 / displayConfig.vsyncPeriod;
     memset(&win_data, 0, sizeof(win_data));
 
-    // OneUI uses PHS modes for VRR to avoid gamma changes causing flickering.
-    win_config[DECON_WIN_UPDATE_IDX].state = (fps > 60) ? decon_win_config::DECON_WIN_STATE_VRR_HSMODE : decon_win_config::DECON_WIN_STATE_VRR_PASSIVEMODE;
+    win_config[DECON_WIN_UPDATE_IDX].state = decon_win_config::DECON_WIN_STATE_MRESOL;
     win_config[DECON_WIN_UPDATE_IDX].dst.f_w = displayConfig.width;
     win_config[DECON_WIN_UPDATE_IDX].dst.f_h = displayConfig.height;
-    win_config[DECON_WIN_UPDATE_IDX].plane_alpha = fps;
-    win_data.fps = fps;
+    win_config[DECON_WIN_UPDATE_IDX].plane_alpha = (int)(1000000000 / displayConfig.vsyncPeriod);
+    win_data.fps = (int)(1000000000 / displayConfig.vsyncPeriod);
 
     HDEBUGLOGD(eDebugDisplayConfig, "(win_config %d) : %dx%d, fps:%d", config,
                win_config[DECON_WIN_UPDATE_IDX].dst.f_w,
@@ -187,8 +183,6 @@ int32_t ExynosDisplayFbInterface::setActiveConfig(ExynosDisplay &exynosDisplay,
 
     if (ret < 0) {
         ALOGE("%s S3CFB_WIN_CONFIG failed errno : %d, ret: %d", __func__, errno, ret);
-    } else {
-        exynosDisplay.invalidate();
     }
 #elif defined(USES_SET_DISPLAY_MODE_IOCTL)
     struct decon_display_mode display_mode;
@@ -206,8 +200,6 @@ int32_t ExynosDisplayFbInterface::setActiveConfig(ExynosDisplay &exynosDisplay,
 
     if (ret < 0) {
         ALOGE("%s EXYNOS_SET_DISPLAY_MODE failed errno : %d, ret: %d", __func__, errno, ret);
-    } else {
-        exynosDisplay.invalidate();
     }
 #endif
 
@@ -224,13 +216,13 @@ int32_t ExynosDisplayFbInterface::setActiveConfig(ExynosDisplay &exynosDisplay,
     return ret;
 }
 
-int32_t ExynosDisplayFbInterface::setActiveConfigWithConstraints(ExynosDisplay &exynosDisplay, hwc2_config_t desiredConfig,
+int32_t ExynosDisplayFbInterface::setActiveConfigWithConstraints(hwc2_config_t desiredConfig,
                                                                  displayConfigs_t &displayConfig, bool test) {
     if (test) {
         HDEBUGLOGD(eDebugDisplayConfig, "Check only possbility");
         return NO_ERROR;
     }
-    return setActiveConfig(exynosDisplay, desiredConfig, displayConfig);
+    return setActiveConfig(desiredConfig, displayConfig);
 }
 
 int32_t ExynosDisplayFbInterface::getDisplayVsyncPeriod(
@@ -445,7 +437,7 @@ int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &conf
             config.plane_alpha = 0;
     } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
                (display_config.state == display_config.WIN_STATE_CURSOR) ||
-               (display_config.state == display_config.WIN_STATE_FINGERPRINT)) {
+	       (display_config.state == display_config.WIN_STATE_FINGERPRINT)) {
         if (display_config.state == display_config.WIN_STATE_BUFFER)
             config.state = config.DECON_WIN_STATE_BUFFER;
         else if (display_config.state == display_config.WIN_STATE_CURSOR)

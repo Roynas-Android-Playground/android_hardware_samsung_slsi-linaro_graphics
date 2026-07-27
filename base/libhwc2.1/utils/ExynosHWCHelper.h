@@ -62,7 +62,6 @@ enum {
     EXYNOS_HWC_DIM_LAYER = 0x00000001,
     EXYNOS_HWC_FORCE_CLIENT_WFD = 0x00000002,
     EXYNOS_HWC_FORCE_CLIENT_HDR_META_ERROR = 0x00000004,
-    EXYNOS_HWC_IGNORE_LAYER = 0x00000008,
 };
 
 enum {
@@ -121,7 +120,6 @@ typedef struct CompressionInfo {
     uint32_t type = COMP_TYPE_NONE;
     uint32_t SAJCMaxBlockSize = 0;
     uint32_t SAJCHeaderOffset = 0;
-    uint32_t SAJCSwMode = 0;
 } compressionInfo_t;
 
 /*

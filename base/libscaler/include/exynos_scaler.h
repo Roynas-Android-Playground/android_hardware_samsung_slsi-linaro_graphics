@@ -85,10 +85,6 @@
 #define V4L2_PIX_FMT_NV12N_SBWCL_64_8B    v4l2_fourcc('N', '1', 'L', '6')
 #define V4L2_PIX_FMT_NV12N_SBWCL_64_10B   v4l2_fourcc('N', '1', 'L', '7')
 
-/* 12 Y/CbCr 4:2:0 SBWC Lossy v2.8 64B align (footprint redunction mode) */
-#define V4L2_PIX_FMT_NV12M_SBWCL_64_8B_FR	v4l2_fourcc('M', '1', 'F', '8')
-#define V4L2_PIX_FMT_NV12M_SBWCL_64_10B_FR	v4l2_fourcc('M', '1', 'F', '1')
-
 /* SBWC Lossy with compression ratio */
 /*
  * Libscaler-m2m1shot can get V4L2 format only,

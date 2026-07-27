@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ifeq ($(BOARD_USES_HWC_SERVICES),true)
+PRODUCT_PROPERTY_OVERRIDES += \
+	ro.vendor.hw.use_hwc_services=1
+endif
+
 ifeq ($(BOARD_USES_VIRTUAL_DISPLAY), true)
 PRODUCT_PROPERTY_OVERRIDES += \
 	ro.vendor.hw.use_virtual_display=1
