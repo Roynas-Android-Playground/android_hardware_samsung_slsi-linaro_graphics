@@ -79,7 +79,6 @@ private:
     int alloc_legacy(int ion_fd, size_t len, unsigned int legacy_heap_mask, unsigned int flags);
     int alloc_modern(int ion_fd, size_t len, unsigned int legacy_heap_mask, unsigned int flags);
     int alloc_dma_heap(size_t len, unsigned int legacy_heap_mask, unsigned int flags);
-    int alloc_ion_fallback(size_t len, unsigned int legacy_heap_mask, unsigned int flags);
     int query_heap_id(int ion_fd, unsigned int legacy_heap_mask);
 
     SystemInterface &systemInterface;
