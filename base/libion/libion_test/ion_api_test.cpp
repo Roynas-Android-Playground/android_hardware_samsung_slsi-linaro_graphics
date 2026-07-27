@@ -40,6 +40,16 @@ using ::testing::_;
 #define mb(nr) ((nr) * 1024 * 1024)
 #define mkb(mnr, knr) ((mnr) * 1024 * 1024 + (knr) * 1024)
 
+ACTION_P2(ReturnWithErrno, result, error) {
+    errno = error;
+    return result;
+}
+
+ACTION_P(SetIonSharedFd, fd) {
+    static_cast<struct ion_fd_data *>(arg2)->fd = fd;
+    return 0;
+}
+
 class MockSystemInterface : public SystemInterface {
 public:
     ~MockSystemInterface() { }
@@ -183,7 +193,7 @@ TEST_F(IonAPI, ModernIon)
     EXPECT_CALL(mockSystemInterface, Ioctl(_, ION_IOC_NEW_ALLOC, _))
         .Times(2)
         .WillOnce(Return(0))
-        .WillOnce(Return(-1));
+        .WillOnce(ReturnWithErrno(-1, EMFILE));
 
     EXPECT_CALL(mockSystemInterface, Ioctl(_, ION_IOC_HEAP_QUERY, _))
         .Times(9)
@@ -221,11 +231,18 @@ TEST_F(IonAPI, ModernIon)
     DmabufExporter ModernExporter(mockSystemInterface);
 
     /* Allocate */
+    errno = EIO;
     EXPECT_EQ(0, ModernExporter.alloc(1, 4096, EXYNOS_ION_HEAP_SYSTEM_MASK, ION_FLAG_CACHED));
+    EXPECT_EQ(0, errno);
     EXPECT_EQ(-1, ModernExporter.alloc(1, 4096, EXYNOS_ION_HEAP_SYSTEM_MASK, ION_FLAG_CACHED));
+    EXPECT_EQ(EMFILE, errno);
+    errno = EIO;
     EXPECT_EQ(-1, ModernExporter.alloc(1, 4096, EXYNOS_ION_HEAP_SYSTEM_MASK, ION_FLAG_CACHED));
+    EXPECT_EQ(EIO, errno);
     EXPECT_EQ(-1, ModernExporter.alloc(1, 4096, EXYNOS_ION_HEAP_SYSTEM_MASK, ION_FLAG_CACHED));
+    EXPECT_EQ(ENODEV, errno);
     EXPECT_EQ(-1, ModernExporter.alloc(1, 4096, 1 << 24, ION_FLAG_CACHED));
+    EXPECT_EQ(ENODEV, errno);
 
     /* Sync */
     EXPECT_EQ(0, ModernExporter.sync(1, 1, 0, 0));
@@ -245,12 +262,12 @@ TEST_F(IonAPI, DmaHeap)
         .WillOnce(Return(1))
         .WillOnce(Return(1))
         .WillOnce(Return(1))
-        .WillOnce(Return(-1));
+        .WillOnce(ReturnWithErrno(-1, EACCES));
 
     EXPECT_CALL(mockSystemInterface, Ioctl(_, DMA_HEAP_IOCTL_ALLOC, _))
         .Times(2)
         .WillOnce(Return(0))
-        .WillOnce(Return(-1));
+        .WillOnce(ReturnWithErrno(-1, EINVAL));
 
     EXPECT_CALL(mockSystemInterface, Ioctl(_, ION_IOC_HEAP_QUERY, _))
         .Times(0);
@@ -296,6 +313,196 @@ TEST_F(IonAPI, DmaHeap)
 
     /* Sync partial */
     EXPECT_EQ(0, DmaHeapExporter.sync_fd_partial(1, 1, 0, 0));
+}
+
+TEST_F(IonAPI, DmaHeapMissingSpecializedHeapFallsBackToLegacyIon)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler")))
+        .WillOnce(ReturnWithErrno(-1, ENOENT));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/ion")))
+        .WillOnce(Return(11));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, EINVAL));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_ALLOC, _))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_SHARE, _))
+        .WillOnce(SetIonSharedFd(42));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, EIO));
+    EXPECT_CALL(mockSystemInterface, Close(11))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Close(42))
+        .WillOnce(Return(0));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    int fd = DmaHeapExporter.alloc(10, 4096, EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                   ION_FLAG_CACHED);
+    EXPECT_EQ(42, fd);
+    EXPECT_EQ(0, errno);
+    EXPECT_EQ(0, DmaHeapExporter.close(fd));
+}
+
+TEST_F(IonAPI, DmaHeapResourceFailureFallsBackToLegacyIon)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vframe")))
+        .WillOnce(Return(12));
+    EXPECT_CALL(mockSystemInterface, Ioctl(12, DMA_HEAP_IOCTL_ALLOC, _))
+        .WillOnce(ReturnWithErrno(-1, ENOMEM));
+    EXPECT_CALL(mockSystemInterface, Close(12))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/ion")))
+        .WillOnce(Return(11));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, EINVAL));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_ALLOC, _))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_SHARE, _))
+        .WillOnce(SetIonSharedFd(43));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Close(11))
+        .WillOnce(Return(0));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(43, DmaHeapExporter.alloc(10, 4096, EXYNOS_ION_HEAP_VIDEO_FRAME_MASK,
+                                        ION_FLAG_CACHED));
+    EXPECT_EQ(0, errno);
+}
+
+TEST_F(IonAPI, DmaHeapLegacyShareFailurePreservesErrno)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler")))
+        .WillOnce(ReturnWithErrno(-1, ENOENT));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/ion")))
+        .WillOnce(Return(11));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, EINVAL));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_ALLOC, _))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_SHARE, _))
+        .WillOnce(ReturnWithErrno(-1, EMFILE));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, EIO));
+    EXPECT_CALL(mockSystemInterface, Close(11))
+        .WillOnce(ReturnWithErrno(-1, EBADF));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(-1, DmaHeapExporter.alloc(10, 4096,
+                                        EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                        ION_FLAG_CACHED));
+    EXPECT_EQ(EMFILE, errno);
+}
+
+TEST_F(IonAPI, DmaHeapModernFallbackQueryFailurePreservesErrno)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler")))
+        .WillOnce(ReturnWithErrno(-1, ENOENT));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/ion")))
+        .WillOnce(Return(11));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_FREE, _))
+        .WillOnce(ReturnWithErrno(-1, ENOTTY));
+    EXPECT_CALL(mockSystemInterface, Ioctl(11, ION_IOC_HEAP_QUERY, _))
+        .WillOnce(ReturnWithErrno(-1, EIO));
+    EXPECT_CALL(mockSystemInterface, Close(11))
+        .WillOnce(ReturnWithErrno(-1, EBADF));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(-1, DmaHeapExporter.alloc(10, 4096,
+                                        EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                        ION_FLAG_CACHED));
+    EXPECT_EQ(EIO, errno);
+}
+
+TEST_F(IonAPI, DmaHeapFallbackOpenFailurePreservesErrno)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler")))
+        .WillOnce(ReturnWithErrno(-1, ENOENT));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/ion")))
+        .WillOnce(ReturnWithErrno(-1, EMFILE));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(-1, DmaHeapExporter.alloc(10, 4096,
+                                        EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                        ION_FLAG_CACHED));
+    EXPECT_EQ(EMFILE, errno);
+}
+
+TEST_F(IonAPI, DmaHeapProtectedFailureDoesNotFallback)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler-secure")))
+        .WillOnce(ReturnWithErrno(-1, ENOENT));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(-1, DmaHeapExporter.alloc(10, 4096, EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                        ION_FLAG_PROTECTED));
+    EXPECT_EQ(ENOENT, errno);
+}
+
+TEST_F(IonAPI, DmaHeapPermissionFailureDoesNotFallback)
+{
+    MockSystemInterface mockSystemInterface;
+    ::testing::InSequence sequence;
+
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/system")))
+        .WillOnce(Return(10));
+    EXPECT_CALL(mockSystemInterface, Close(10))
+        .WillOnce(Return(0));
+    EXPECT_CALL(mockSystemInterface, Open(::testing::StrEq("/dev/dma_heap/vscaler")))
+        .WillOnce(ReturnWithErrno(-1, EACCES));
+
+    DmabufExporter DmaHeapExporter(mockSystemInterface);
+
+    EXPECT_EQ(-1, DmaHeapExporter.alloc(10, 4096, EXYNOS_ION_HEAP_VIDEO_SCALER_MASK,
+                                        ION_FLAG_CACHED));
+    EXPECT_EQ(EACCES, errno);
 }
 
 TEST_F(IonAPI, TraceNoLegacy)
