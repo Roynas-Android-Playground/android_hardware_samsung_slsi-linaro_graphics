@@ -40,7 +40,8 @@
  * The vendor system heap is the same purpose allocator as the system heap,
  * but it is optimized and supports debugging function for exynos.
  */
-#define EXYNOS_ION_HEAP_VENDOR_SYSTEM_MASK  (1 << 14)
+#define EXYNOS_ION_HEAP_VENDOR_SYSTEM_ID    14
+#define EXYNOS_ION_HEAP_VENDOR_SYSTEM_MASK  (1 << EXYNOS_ION_HEAP_VENDOR_SYSTEM_ID)
 
 #define ION_MAX_HEAP_COUNT 15
 
@@ -73,6 +74,40 @@ static const struct {
 #define ION_NUM_HEAP_NAMES (unsigned int)(sizeof(ion_heap_name)/sizeof(ion_heap_name[0]))
 
 #define ION_HEAP_TYPE_NONE INT_MAX
+
+static int get_legacy_heap_id(unsigned int legacy_heap_mask) {
+    for (int id = 0; id < ION_MAX_HEAP_COUNT; id++) {
+        if (legacy_heap_mask & (1 << id))
+            return id;
+    }
+
+    return -1;
+}
+
+static bool is_specialized_dma_heap(unsigned int legacy_heap_mask) {
+    int id = get_legacy_heap_id(legacy_heap_mask);
+
+    return id > ION_EXYNOS_HEAP_ID_SYSTEM &&
+           id != EXYNOS_ION_HEAP_VENDOR_SYSTEM_ID;
+}
+
+static bool is_dma_heap_fallback_error(int error) {
+    switch (error) {
+    case ENOENT:
+    case ENODEV:
+    case ENXIO:
+    case ENOTTY:
+    case EOPNOTSUPP:
+    case ENOSYS:
+    case ENOMEM:
+    case ENOSPC:
+    case EAGAIN:
+    case EBUSY:
+        return true;
+    default:
+        return false;
+    }
+}
 
 const char *exynos_ion_get_heap_name(unsigned int legacy_heap_id) {
     if (legacy_heap_id >= ION_NUM_HEAP_NAMES)
@@ -116,21 +151,34 @@ int DmabufExporter::alloc_legacy(int ion_fd, size_t len, unsigned int heap_mask,
 
     ret = systemInterface.Ioctl(ion_fd, ION_IOC_ALLOC, &alloc_data);
     if (ret < 0) {
+        int alloc_errno = errno;
+
         ALOGE("%s(%d, %zu, %#x, %#x) ION_IOC_ALLOC failed: %s", __func__,
-              ion_fd, len, heap_mask, flags, strerror(errno));
+              ion_fd, len, heap_mask, flags, strerror(alloc_errno));
+        errno = alloc_errno;
         return -1;
     }
 
     fd_data.handle = alloc_data.handle;
 
     ret = systemInterface.Ioctl(ion_fd, ION_IOC_SHARE, &fd_data);
-    legacy_free_handle(ion_fd, alloc_data.handle);
+    int share_errno = ret < 0 ? errno : 0;
+    int free_ret = legacy_free_handle(ion_fd, alloc_data.handle);
+    int free_errno = errno;
     if (ret < 0) {
         ALOGE("%s(%d, %zu, %#x, %#x) ION_IOC_SHARE failed: %s", __func__,
-              ion_fd, len, heap_mask, flags, strerror(errno));
+              ion_fd, len, heap_mask, flags, strerror(share_errno));
+        if (free_ret < 0)
+            ALOGE("%s(%d, %d) ION_IOC_FREE failed after SHARE failure: %s",
+                  __func__, ion_fd, alloc_data.handle, strerror(free_errno));
+        errno = share_errno;
         return -1;
     }
+    if (free_ret < 0)
+        ALOGE("%s(%d, %d) ION_IOC_FREE failed after SHARE: %s", __func__,
+              ion_fd, alloc_data.handle, strerror(free_errno));
 
+    errno = 0;
     return fd_data.fd;
 }
 
@@ -146,8 +194,11 @@ int DmabufExporter::query_heap_id(int ion_fd, unsigned int legacy_heap_mask) {
     query.heaps = (__u64)data;
 
     if (systemInterface.Ioctl(ion_fd, ION_IOC_HEAP_QUERY, &query) < 0) {
+        int query_errno = errno;
+
         ALOGE("%s: failed query heaps with ion_fd %d: %s",
-              __func__, ion_fd, strerror(errno));
+              __func__, ion_fd, strerror(query_errno));
+        errno = query_errno;
         return 0;
     }
 
@@ -157,11 +208,14 @@ int DmabufExporter::query_heap_id(int ion_fd, unsigned int legacy_heap_mask) {
     for (legacy_heap_id = 0; legacy_heap_id < ION_NUM_HEAP_NAMES; legacy_heap_id++) {
         if ((1 << legacy_heap_id) & legacy_heap_mask) {
             for (i = 0; i < ION_NUM_HEAP_IDS; i++) {
-                if (!strcmp(data[i].name, ion_heap_name[legacy_heap_id].name))
+                if (!strcmp(data[i].name, ion_heap_name[legacy_heap_id].name)) {
+                    errno = 0;
                     return 1 << data[i].heap_id;
+                }
             }
         }
     }
+    errno = ENODEV;
     return 0;
 }
 
@@ -180,35 +234,40 @@ int DmabufExporter::alloc_modern(int ion_fd, size_t len, unsigned int legacy_hea
         data.heap_id_mask = query_heap_id(ion_fd, legacy_heap_mask);
 
     if (!data.heap_id_mask) {
-        ALOGE("%s: unable to find heaps of heap_mask %#x", __func__, legacy_heap_mask);
+        int query_errno = errno ? errno : ENODEV;
+
+        ALOGE("%s: unable to find heaps of heap_mask %#x: %s", __func__,
+              legacy_heap_mask, strerror(query_errno));
+        errno = query_errno;
         return -1;
     }
 
     ret = systemInterface.Ioctl(ion_fd, ION_IOC_NEW_ALLOC, &data);
     if (ret < 0) {
+        int alloc_errno = errno;
+
         ALOGE("%s(%d, %zu, %#x(%#x), %#x) failed: %s", __func__,
-              ion_fd, len, legacy_heap_mask, data.heap_id_mask, flags, strerror(errno));
+              ion_fd, len, legacy_heap_mask, data.heap_id_mask, flags,
+              strerror(alloc_errno));
+        errno = alloc_errno;
         return -1;
     }
 
+    errno = 0;
     return (int)data.fd;
 }
 
 int DmabufExporter::alloc_dma_heap(size_t len, unsigned int legacy_heap_mask, unsigned int flags) {
     char path[MAX_HEAP_PATH];
-    int id;
+    int id = get_legacy_heap_id(legacy_heap_mask);
 
     strcpy(path, DmaHeapRoot);
-    for (id = 0; id < ION_NUM_HEAP_NAMES; id++) {
-        if (legacy_heap_mask & (1 << id)) {
-            strcat(path, ion_heap_name[id].dmaheap_name);
-            break;
-        }
-    }
-    if (id == ION_NUM_HEAP_NAMES) {
+    if (id < 0) {
         ALOGE("%s invalid heapmask (%zu, %#x, %#x)", __func__, len, legacy_heap_mask, flags);
+        errno = EINVAL;
         return -EINVAL;
     }
+    strcat(path, ion_heap_name[id].dmaheap_name);
 
     /* Append heap name for flags */
     if (flags & ION_FLAG_PROTECTED)
@@ -218,8 +277,11 @@ int DmabufExporter::alloc_dma_heap(size_t len, unsigned int legacy_heap_mask, un
 
     int ret, fd = systemInterface.Open(path);
     if (fd < 0) {
+        int open_errno = errno;
+
         ALOGE("%s No device for %s (%zu, %#x, %#x) failed: %s", __func__,
-              path, len, legacy_heap_mask, flags, strerror(errno));
+              path, len, legacy_heap_mask, flags, strerror(open_errno));
+        errno = open_errno;
         return fd;
     }
     struct dma_heap_allocation_data data;
@@ -230,15 +292,49 @@ int DmabufExporter::alloc_dma_heap(size_t len, unsigned int legacy_heap_mask, un
     data.heap_flags = 0;
 
     ret = systemInterface.Ioctl(fd, DMA_HEAP_IOCTL_ALLOC, &data);
-    if (ret < 0)
+    int alloc_errno = ret < 0 ? errno : 0;
+    if (ret < 0) {
         ALOGE("%s Allocation failure for %s (%zu, %#x, %#x) failed: %s", __func__,
-              path, len, legacy_heap_mask, flags, strerror(errno));
-    else
+              path, len, legacy_heap_mask, flags, strerror(alloc_errno));
+    } else {
         ret = data.fd;
+    }
 
     systemInterface.Close(fd);
+    errno = alloc_errno;
 
     return ret;
+}
+
+int DmabufExporter::alloc_ion_fallback(size_t len, unsigned int legacy_heap_mask,
+                                       unsigned int flags) {
+    int ion_fd = systemInterface.Open("/dev/ion");
+    if (ion_fd < 0) {
+        int open_errno = errno;
+
+        ALOGE("%s failed to open /dev/ion: %s", __func__,
+              strerror(open_errno));
+        errno = open_errno;
+        return ion_fd;
+    }
+
+    errno = 0;
+    int probe_ret = legacy_free_handle(ion_fd, 0);
+    int probe_errno = errno;
+    int fd;
+
+    if (probe_ret < 0 && probe_errno == ENOTTY)
+        fd = alloc_modern(ion_fd, len, legacy_heap_mask, flags);
+    else
+        fd = alloc_legacy(ion_fd, len, legacy_heap_mask, flags);
+
+    int alloc_errno = fd < 0 ? errno : 0;
+    if (systemInterface.Close(ion_fd) < 0)
+        ALOGE("%s failed to close fallback ION fd %d: %s",
+              __func__, ion_fd, strerror(errno));
+    errno = alloc_errno;
+
+    return fd;
 }
 
 int DmabufExporter::open(void) {
@@ -266,12 +362,30 @@ int DmabufExporter::close(int fd) {
 int DmabufExporter::alloc(int ion_fd, size_t len, unsigned int legacy_heap_mask, unsigned int flags) {
     int fd;
 
-    if (version == DMAHEAP_VERSION)
+    if (version == DMAHEAP_VERSION) {
         fd = alloc_dma_heap(len, legacy_heap_mask, flags);
-    else if (version == ION_LEGACY_VERSION)
+        if (fd >= 0)
+            return fd;
+
+        int dma_heap_errno = errno;
+        /*
+         * Legacy system ION does not guarantee protected backing. Only
+         * availability failures from non-protected specialized heaps may
+         * fall back; permission and validation errors remain authoritative.
+         */
+        if (!(flags & ION_FLAG_PROTECTED) &&
+            is_specialized_dma_heap(legacy_heap_mask) &&
+            is_dma_heap_fallback_error(dma_heap_errno)) {
+            ALOGW("%s DMA heap allocation failed for mask %#x: %s; falling back to ION",
+                  __func__, legacy_heap_mask, strerror(dma_heap_errno));
+            return alloc_ion_fallback(len, legacy_heap_mask, flags);
+        }
+        errno = dma_heap_errno;
+    } else if (version == ION_LEGACY_VERSION) {
         fd = alloc_legacy(ion_fd, len, legacy_heap_mask, flags);
-    else
+    } else {
         fd = alloc_modern(ion_fd, len, legacy_heap_mask, flags);
+    }
 
     return fd;
 }
